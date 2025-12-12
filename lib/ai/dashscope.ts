@@ -22,7 +22,6 @@ function getDashScopeClient(): DashScopeClient {
   cachedClient = createOpenAI({
     baseURL: DASH_SCOPE_BASE_URL,
     apiKey,
-    compatibility: "compatible",
   });
 
   return cachedClient;
@@ -85,14 +84,21 @@ export async function rerankDocuments({
   }
 
   const data = (await response.json()) as {
-    output?: { results?: Array<{ index?: number; score?: number }> };
+    output?: {
+      results?: Array<{ index?: number; score?: number; relevance_score?: number }>;
+    };
   };
 
   const items = data.output?.results ?? [];
   return items
     .map((item) => ({
       index: typeof item.index === "number" ? item.index : 0,
-      score: typeof item.score === "number" ? item.score : 0,
+      score:
+        typeof item.relevance_score === "number"
+          ? item.relevance_score
+          : typeof item.score === "number"
+            ? item.score
+            : 0,
     }))
     .filter((item) => item.index >= 0 && item.index < documents.length);
 }

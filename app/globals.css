@@ -28,21 +28,34 @@ main {
 }
 
 .chat-shell {
+  width: 100%;
+  padding: 4rem 1.5rem 2rem;
+}
+
+.chat-inner {
+  width: min(820px, 100%);
   margin: 0 auto;
-  padding: 3rem 1.5rem 2rem;
-  width: min(720px, 100%);
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
+  gap: 2rem;
+}
+
+.chat-hero {
+  width: 100%;
+  background: #faf8f4;
+  padding: 2rem 0 1rem;
+  box-shadow: none;
 }
 
 .chat-shell header {
   text-align: center;
+  padding-bottom: 1.5rem;
 }
 
 .chat-shell header h1 {
-  margin: 0.35rem 0 0.25rem;
-  font-size: clamp(2rem, 3vw, 2.5rem);
+  margin: 0.75rem 0 0;
+  font-size: clamp(2.3rem, 3.5vw, 2.9rem);
+  letter-spacing: -0.02em;
 }
 
 .chat-shell header p {
@@ -53,21 +66,78 @@ main {
 
 .badge {
   text-transform: uppercase;
-  letter-spacing: 0.15em;
-  font-size: 0.7rem;
+  letter-spacing: 0.18em;
+  font-size: 0.68rem;
   color: var(--muted);
+  margin-bottom: 0.75rem;
+}
+
+.hero-subtitle {
+  margin-top: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  font-size: 0.95rem;
+  color: var(--muted);
+}
+
+.chat-tabs-row {
+  margin-top: 3rem;
+  padding: 0.75rem 0 1rem;
+  border-bottom: 1px solid #dad5cc;
 }
 
 .chat-card {
   flex: 1;
   display: flex;
   flex-direction: column;
-  min-height: 60vh;
+  min-height: 70vh;
   border-radius: 1.2rem;
   border: 1px solid var(--border);
   background: var(--card);
   box-shadow: 0 25px 60px rgba(15, 23, 42, 0.08);
   overflow: hidden;
+}
+
+.chat-tabs {
+  display: flex;
+  gap: 0.5rem;
+  background: #faf8f4;
+  border-radius: 1rem;
+  padding: 0.2rem;
+}
+
+.chat-tab {
+  flex: 1;
+  border: none;
+  background: transparent;
+  padding: 0.85rem 1rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  color: var(--muted);
+  border-bottom: 2px solid transparent;
+  transition: color 0.2s ease, background 0.2s ease;
+}
+
+.chat-tab.is-active {
+  color: var(--foreground);
+  background: rgba(255, 255, 255, 0.7);
+  border-bottom-color: #dad5cc;
+}
+
+.chat-error {
+  padding: 0.9rem 1rem;
+  background: rgba(180, 35, 24, 0.1);
+  color: #b42318;
+  border-bottom: 1px solid rgba(180, 35, 24, 0.25);
+}
+
+.chat-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
 .message-list {
@@ -84,6 +154,8 @@ main {
   border-radius: 0.9rem;
   padding: 0.85rem 1rem;
   background: rgba(15, 23, 42, 0.02);
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .message-role {
@@ -92,12 +164,6 @@ main {
   font-size: 0.7rem;
   letter-spacing: 0.08em;
   color: var(--muted);
-}
-
-.message-text {
-  margin: 0.4rem 0 0;
-  line-height: 1.6;
-  white-space: pre-wrap;
 }
 
 .message--user {
@@ -110,13 +176,19 @@ main {
 }
 
 .message--assistant {
-  background: rgba(15, 98, 254, 0.12);
+  background: #faf8f4;
+}
+
+.message.is-selected {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px rgba(15, 98, 254, 0.25);
 }
 
 .message-list-empty {
   color: var(--muted);
   text-align: center;
   font-size: 0.95rem;
+  padding: 2rem 1rem;
 }
 
 .chat-form {
@@ -140,6 +212,115 @@ main {
 .chat-form textarea:focus-visible {
   border-color: var(--primary);
   box-shadow: 0 0 0 3px rgba(15, 98, 254, 0.2);
+}
+
+.sources-panel {
+  flex: 1;
+  padding: 1.5rem;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.sources-context {
+  border: 1px solid var(--border);
+  border-radius: 0.9rem;
+  padding: 0.75rem 1rem;
+  background: rgba(15, 23, 42, 0.02);
+}
+
+.sources-context__label {
+  margin: 0;
+  font-size: 0.8rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.sources-context__bubble {
+  margin: 0.35rem 0 0;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+.sources-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.sources-history-item {
+  margin-bottom: 1rem;
+}
+
+.sources-history-question {
+  margin: 0 0 0.35rem;
+  font-weight: 600;
+  color: var(--foreground);
+}
+
+.sources-history-question.is-active {
+  color: var(--primary);
+}
+
+.sources-history-rewrite {
+  margin: 0 0 0.5rem;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.source-card {
+  border: 1px solid #e6e2db;
+  border-radius: 1rem;
+  padding: 1.05rem 1.1rem;
+  background: rgba(15, 23, 42, 0.015);
+  box-shadow: 0 6px 14px rgba(15, 23, 42, 0.015);
+}
+
+.source-card__header {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: flex-start;
+}
+
+.source-card__title {
+  margin: 0;
+  font-weight: 600;
+}
+
+.source-card__meta {
+  margin: 0.25rem 0 0;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.source-card__link {
+  font-size: 0.85rem;
+  color: #7b8c9a;
+  text-decoration: none;
+  border-bottom: 1px dotted rgba(123, 140, 154, 0.35);
+}
+
+.source-card__link:hover {
+  color: #596775;
+  border-bottom-color: rgba(89, 103, 117, 0.5);
+}
+
+.source-card__summary {
+  margin: 1rem 0 0.75rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.source-card__body {
+  margin: 0 0 0.85rem;
+  line-height: 1.8;
+  white-space: pre-wrap;
 }
 
 .chat-form-actions {
@@ -166,8 +347,12 @@ main {
 }
 
 .button--primary {
-  background: var(--primary);
-  color: var(--primary-foreground);
+  background: #e5e0d8;
+  color: var(--foreground);
+}
+
+.button--primary:not(:disabled):hover {
+  background: #efeae2;
 }
 
 .button:disabled {
@@ -181,7 +366,19 @@ main {
 
 @media (max-width: 640px) {
   .chat-shell {
-    padding: 2rem 1rem 1.5rem;
+    padding: 2.5rem 1rem 1.5rem;
+  }
+
+  .chat-inner {
+    gap: 1.5rem;
+  }
+
+  .chat-hero {
+    padding: 1.5rem 0 0.75rem;
+  }
+
+  .chat-tabs-row {
+    margin-top: 2rem;
   }
 
   .chat-card {
@@ -191,4 +388,29 @@ main {
   .chat-form textarea {
     min-height: 130px;
   }
+}
+.message-text {
+  margin: 0.4rem 0 0;
+  line-height: 1.8;
+}
+
+.message-text p {
+  margin: 0 0 0.85rem;
+}
+
+.message-text pre {
+  margin: 0.75rem 0;
+  padding: 0.75rem;
+  background: rgba(15, 23, 42, 0.08);
+  border-radius: 0.6rem;
+  overflow-x: auto;
+}
+
+.message-text code {
+  font-family: "JetBrains Mono", "SFMono-Regular", Consolas, "Liberation Mono",
+    Menlo, monospace;
+  font-size: 0.9em;
+  background: rgba(15, 23, 42, 0.08);
+  padding: 0.15rem 0.35rem;
+  border-radius: 0.25rem;
 }

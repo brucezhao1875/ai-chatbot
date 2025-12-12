@@ -4,6 +4,7 @@ type SearchResult = {
   id: string | number;
   content: string;
   payload?: Record<string, unknown>;
+  score?: number;
 };
 
 let cachedClient: QdrantClient | null = null;
@@ -58,5 +59,6 @@ export async function searchQdrant(
       (item.payload?.text as string | undefined) ??
       "",
     payload: item.payload ?? undefined,
+    score: typeof item.score === "number" ? item.score : undefined,
   }));
 }

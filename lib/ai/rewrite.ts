@@ -1,7 +1,10 @@
 const REWRITE_PROMPT = `你是一个隆波帕默尊者佛法问答系统的智能助手。
-你的任务是根据用户的输入，提取出用于检索佛法数据库的核心问题。
-请去除寒暄语、无关的背景描述，将问题转化为一个清晰、独立的查询语句。
-不要回答用户的问题，只输出改写后的查询语句。`;
+请完成两个任务：
+1. 判断来访问题是否与佛法、修行、人生困惑、内观实践相关，若相关则 isRelevant 为 true，否则为 false。
+2. 当 isRelevant 为 true 时，将问题改写为适合检索佛法资料库的精炼查询语句；当 isRelevant 为 false 时，可直接返回原问题或空字符串。
+
+严格输出 JSON，不要包含任何解释或多余文字，例如：
+{"isRelevant":true,"query":"如何在生活中保持四念处练习"}`;
 
 const REWRITE_ENDPOINT =
   "https://dashscope.aliyuncs.com/api/v1/services/aigc/text-generation/generation";
@@ -18,16 +21,25 @@ type DashScopeRewriteResponse = {
   };
 };
 
-export async function rewriteQuery(userQuery: string): Promise<string> {
+type RewriteQueryResult = { isRelevant: boolean; query: string };
+
+const FALLBACK_RESULT = (query: string, isRelevant = true): RewriteQueryResult => ({
+  isRelevant,
+  query,
+});
+
+export async function rewriteQuery(
+  userQuery: string
+): Promise<RewriteQueryResult> {
   const fallback = (userQuery ?? "").trim();
   if (!fallback) {
-    return fallback;
+    return { isRelevant: false, query: "" };
   }
 
   const apiKey = process.env.DASHSCOPE_API_KEY;
   if (!apiKey) {
     console.warn("[rewrite] Missing DASHSCOPE_API_KEY, skip rewrite.");
-    return fallback;
+    return FALLBACK_RESULT(fallback);
   }
 
   try {
@@ -55,11 +67,49 @@ export async function rewriteQuery(userQuery: string): Promise<string> {
     const data = (await response.json()) as DashScopeRewriteResponse;
     const content =
       data.output?.choices?.[0]?.message?.content ?? data.output?.text ?? "";
-    const rewritten = content.trim();
 
-    return rewritten.length ? rewritten : fallback;
+    const parsed = parseRewriteResponse(content);
+    const isRelevant =
+      typeof parsed.isRelevant === "boolean" ? parsed.isRelevant : true;
+    const queryText =
+      typeof parsed.query === "string" && parsed.query.trim().length
+        ? parsed.query.trim()
+        : fallback;
+
+    return { isRelevant, query: queryText };
   } catch (error) {
-    console.warn("[rewrite] Failed to rewrite query, fallback to original", error);
-    return fallback;
+    console.warn(
+      "[rewrite] Failed to rewrite query, fallback to original",
+      error
+    );
+    return FALLBACK_RESULT(fallback);
   }
+}
+
+type PartialRewritePayload = {
+  isRelevant?: unknown;
+  query?: unknown;
+};
+
+function parseRewriteResponse(raw: string): PartialRewritePayload {
+  const trimmed = raw?.trim();
+  if (!trimmed) {
+    return {};
+  }
+
+  const candidate = extractJsonBlock(trimmed);
+  try {
+    return JSON.parse(candidate) as PartialRewritePayload;
+  } catch {
+    return {};
+  }
+}
+
+function extractJsonBlock(raw: string): string {
+  const start = raw.indexOf("{");
+  const end = raw.lastIndexOf("}");
+  if (start !== -1 && end !== -1 && end > start) {
+    return raw.slice(start, end + 1);
+  }
+  return raw;
 }

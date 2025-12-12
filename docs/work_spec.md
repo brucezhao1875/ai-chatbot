@@ -1,176 +1,83 @@
-# AI Chat Application Work Specification (Work SRS)
+# 项目工作说明书 (Work Specification)
 
-## 1. Project Overview
-This project is an AI-assisted Q&A system. Users submit a question, the backend retrieves relevant video transcripts from a knowledge base, re-ranks them, and provides the top relevant sources. The AI model then generates a summarized answer based on those sources.  
-The UI presents two main views: **Answer** and **Sources**, allowing users to read the AI summary and inspect original transcripts.
+本文档定义了 Chatbot Web 项目后端 API 的实现规范。核心目标是利用 Vercel AI SDK 的 `StreamData` 功能，在单次请求中同时返回流式回答和结构化的引用来源数据，并具备智能的意图路由能力。
 
----
+## 1. 核心架构策略
+*   **混合模式**：
+    *   Chat/Embedding/Rewrite: 使用 Vercel AI SDK (`@ai-sdk/openai`) 连接 DashScope。
+    *   Rerank: 使用原生 Fetch 调用 DashScope API。
+*   **单接口多数据**：
+    *   仅维护 `/api/chat` 一个接口。
+    *   使用 `StreamData` 协议，将 RAG 检索到的来源数据（Source Items）与 LLM 的流式文本一同返回。
+*   **意图路由 (Router)**:
+    *   后端通过 LLM 识别用户意图，自动在“闲聊模式”和“RAG 检索模式”之间切换。
 
-## 2. Core Functional Requirements
+## 2. 环境变量配置 (依赖契约)
 
-### 2.1 User Question Input
-- User enters a question via an input bar at the bottom of the interface.
-- System submits the question to backend services.
+必须在 `.env.local` 中配置：
 
-### 2.2 Backend Retrieval Workflow
-- Retrieve all related video subtitles based on embeddings / similarity search.
-- Re-rank results using internal scoring logic.
-- Select top N transcripts.
-- Send selected transcripts to an LLM to produce a summarized answer.
-- Return both:
-  - AI Summary (answer)
-  - List of sources (videos + transcripts)
+| 变量名 | 说明 |
+| :--- | :--- |
+| `DASHSCOPE_API_KEY` | 阿里云 DashScope API Key |
+| `QDRANT_URL` | Qdrant 实例地址 |
+| `QDRANT_API_KEY` | Qdrant 访问密钥 (可选) |
+| `QDRANT_COLLECTION` | 向量集合名称 |
+| `QDRANT_VECTOR_NAME` | 向量字段名称 (可选) |
 
----
+## 3. 数据契约：来源对象 (`SourceItem`)
 
-## 3. UI Architecture (Two Main Tabs)
+这是后端通过 `StreamData` 返回给前端的数据结构。
 
-The application UI is divided into two top-level pages:
+```typescript
+interface SourceItem {
+  id: string;            // 唯一标识 (Qdrant segment_id)
+  title: string;         // 视频标题 (video_title)
+  url: string;           // 来源链接 (source_url)
+  transcript: string;    // 字幕文本 (text_readable), 建议截断前 200 字
+  score: number;         // Rerank 相似度分数
+  metadata: {
+    startTime: number;   // start_time_seconds
+    endTime: number;     // end_time_seconds
+  };
+}
+```
 
-### **TAB 1: Answer Page**
-- Displays the AI-generated summary.
-- Text should appear in paragraph-based document format (not chat bubbles).
-- Content area must support long-form text.
-- Reading experience must be fluid and structured.
+## 4. 接口规范 (`POST /api/chat`)
 
-### **TAB 2: Sources Page**
-- Displays all source materials used in generating the answer.
-- Each source contains:
-  - Video Title  
-  - YouTube Link (opens in a new window)  
-  - Transcript (default collapsed; expandable)
+### 4.1 处理流程 (Router Flow)
 
-#### Transcript Handling
-- Transcripts can be very long (thousands of lines).
-- Must be collapsible to avoid overwhelming the UI.
-- When expanded, show full transcript in readable mono/paragraph text.
+1.  **初始化**: 创建 `StreamData` 实例。
+2.  **意图识别与改写 (Rewrite & Classify)**:
+    *   调用 `rewriteQuery`，判断 `isRelevant` (是否与佛法/修行相关) 并生成优化后的 Query。
+3.  **分支处理**:
+    *   **分支 A (闲聊模式 `isRelevant === false`)**:
+        *   **跳过** RAG 检索。
+        *   向流中注入空来源：`data.append({ type: 'sources', payload: [] })`。
+        *   **Prompt**: 使用“通用助手”人设，语气谦和。
+    *   **分支 B (检索模式 `isRelevant === true`)**:
+        *   **Embed**: 生成 Query 向量。
+        *   **Search**: Qdrant Top-K 检索。
+        *   **Rerank**: DashScope GTE Rerank (Top-N)。
+        *   **注入**: 将 Top-N 文档映射为 `SourceItem[]` 并注入流。
+        *   **Prompt**: 使用“佛法助手”人设，包含引用上下文。
+4.  **生成回答**:
+    *   调用 `streamText`。
+    *   **人设要求**: 语气需具备“法味”，多用“善友”、“随喜功德”等词汇，减少机械寒暄。
+5.  **返回**:
+    *   使用 `result.toDataStreamResponse({ data })` 返回混合流。
 
----
+## 5. 前端消费规范
 
-## 4. Layout Specification
+前端 (Tab2 组件):
+1.  **状态同步**: 监听 `data` 变化。
+2.  **UI 渲染**:
+    *   若收到 `payload: []` (空数组)，Tab2 显示“暂无参考资料”或隐藏。
+    *   若收到有效数组，渲染引用卡片列表。
+3.  **称呼显示**:
+    *   User -> "善友" (或根据配置)
+    *   AI -> "法友" (或根据配置)
 
-### 4.1 Max-Width Container (Perplexity-like)
-- All content (Answer and Sources) must stay inside a fixed-width layout:
-  - **max-width: 760–840px (recommended: 780px)**
-- Container must be centered horizontally.
-- Tabs and content share the same width container.
-- Switching tabs must not cause page shifting.
+## 6. 鲁棒性要求
 
-### 4.2 Header
-- Displays application title (e.g., "AI Chat").
-- Stays centered with the same content width.
-
-### 4.3 Tabs
-- Two tabs:
-  - **Answer**
-  - **Sources**
-- Clicking a tab shows the corresponding content section.
-- Tabs must remain visually consistent and centered.
-
-### 4.4 Input Bar
-- Stays at the bottom.
-- Always visible.
-- Allows user to enter new questions.
-- Should span full width, but input field content stays aligned with the 780px container.
-
----
-
-## 5. Interaction Design
-
-### 5.1 Ask → Retrieve → Answer Flow
-1. User submits a question.
-2. System fetches relevant video transcripts.
-3. Backend ranks and selects top sources.
-4. LLM generates summary.
-5. UI displays:
-   - Answer in **Answer Tab**
-   - Sources in **Sources Tab**
-
-### 5.2 Transcript Expansion
-- Sources page lists each video as:
-  ```
-  Video Title
-  [Open Video on YouTube]
-  [Expand Transcript]
-  ```
-- Clicking **Expand** shows:
-  - timestamped lines  
-  - raw transcript text  
-
-### 5.3 Video Link Behavior
-- Clicking a YouTube link opens in a **new browser window**.
-- No embedded players in the current UI version.
-
----
-
-## 6. Component Architecture
-
-### 6.1 `ChatLayout`
-- Controls page width, centering, vertical stacking.
-- Contains Header, Tabs, TabContent, InputBar.
-
-### 6.2 `Tabs`
-- Renders Answer / Sources tab controls.
-- State-managed: activeTab = "answer" | "sources".
-
-### 6.3 `AnswerView`
-- Displays AI-generated summary.
-- Text rendered in structured paragraphs.
-
-### 6.4 `SourcesView`
-- Displays list of source items.
-
-### 6.5 `SourceItem`
-Contains:
-- `VideoTitle`
-- `ExternalLinkButton` (YouTube)
-- `TranscriptToggle`
-- `TranscriptView` (collapsed by default)
-
-### 6.6 `TranscriptView`
-- Long text renderer.
-- Scrollable or block-based.
-- Supports line breaks and timestamps.
-
-### 6.7 `InputBar`
-- Text input for user questions.
-- Submit button or Enter-key trigger.
-
----
-
-## 7. Error Handling
-
-### Retrieval Failures
-- Display fallback message: "Unable to retrieve sources."
-
-### LLM Failure
-- Display neutral error message.
-
-### Transcript Missing
-- Show: "Transcript not available."
-
----
-
-## 8. Performance Considerations
-
-### Large Transcript Handling
-- Use lazy rendering for large text.
-- Always default to collapsed state.
-
-### Memory Efficiency
-- Avoid loading all transcripts into DOM until expanded.
-
----
-
-## 9. Future Enhancements (Optional)
-- Modal video player (inline preview)
-- Highlighting transcript passages referenced by AI
-- Multi-language subtitle support
-- Source scoring display
-
----
-
-## 10. Summary
-This specification defines the UX, structure, logic, and behavior for an AI chat application that presents both AI summaries and verifiable source transcripts.  
-The interface must be simple, structured, and optimized for long-form reading, following a Perplexity-style dual-tab model.
-
+1.  **Rerank 失败**: 降级使用 Qdrant 检索结果，确保 Tab2 不空白。
+2.  **Rewrite 失败**: 默认视为 `isRelevant = true` 并使用原始查询，避免漏掉潜在的修行问题。
