@@ -1,71 +1,48 @@
-<a href="https://chat.vercel.ai/">
-  <img alt="Next.js 14 and App Router-ready AI chatbot." src="app/(chat)/opengraph-image.png">
-  <h1 align="center">Chat SDK</h1>
-</a>
+<h1 align="center">Chat SDK</h1>
 
 <p align="center">
-    Chat SDK is a free, open-source template built with Next.js and the AI SDK that helps you quickly build powerful chatbot applications.
+  Chat SDK now ships in a strict <strong>stateless</strong> mode. The entire chat history lives in the browser and disappears on refresh, making it easy to deploy without databases, auth, or migrations.
 </p>
 
 <p align="center">
-  <a href="https://chat-sdk.dev"><strong>Read Docs</strong></a> ·
   <a href="#features"><strong>Features</strong></a> ·
   <a href="#model-providers"><strong>Model Providers</strong></a> ·
-  <a href="#deploy-your-own"><strong>Deploy Your Own</strong></a> ·
   <a href="#running-locally"><strong>Running locally</strong></a>
 </p>
 <br/>
 
 ## Features
 
-- [Next.js](https://nextjs.org) App Router
-  - Advanced routing for seamless navigation and performance
-  - React Server Components (RSCs) and Server Actions for server-side rendering and increased performance
-- [AI SDK](https://ai-sdk.dev/docs/introduction)
-  - Unified API for generating text, structured objects, and tool calls with LLMs
-  - Hooks for building dynamic chat and generative user interfaces
-  - Supports xAI (default), OpenAI, Fireworks, and other model providers
-- [shadcn/ui](https://ui.shadcn.com)
-  - Styling with [Tailwind CSS](https://tailwindcss.com)
-  - Component primitives from [Radix UI](https://radix-ui.com) for accessibility and flexibility
-- Data Persistence
-  - [Neon Serverless Postgres](https://vercel.com/marketplace/neon) for saving chat history and user data
-  - [Vercel Blob](https://vercel.com/storage/blob) for efficient file storage
-- [Auth.js](https://authjs.dev)
-  - Simple and secure authentication
+- Single-page [Next.js](https://nextjs.org) App Router setup
+- Stateless chat powered by [`useChat`](https://ai-sdk.dev/docs/react/use-chat)
+- Streaming responses through the [Vercel AI SDK](https://ai-sdk.dev)
+- DashScope-based RAG pipeline（query rewrite → text-embedding-v3 → Qdrant → gte-rerank → Qwen chat）
+- Minimal UI built with hand-rolled CSS (no shadcn/ui or Radix dependencies)
+- No databases, migrations, auth flows, or artifacts side panels to configure
 
 ## Model Providers
 
-This template uses the [Vercel AI Gateway](https://vercel.com/docs/ai-gateway) to access multiple AI models through a unified interface. The default configuration includes [xAI](https://x.ai) models (`grok-2-vision-1212`, `grok-3-mini`) routed through the gateway.
+The app calls DashScope (通义千问) directly via the AI SDK’s OpenAI-compatible client:
 
-### AI Gateway Authentication
+- Chat model: `qwen-max`
+- Embedding model: `text-embedding-v3`
+- Rerank model: `gte-rerank` (REST API)
 
-**For Vercel deployments**: Authentication is handled automatically via OIDC tokens.
+Configure the following env vars locally / on Vercel:
 
-**For non-Vercel deployments**: You need to provide an AI Gateway API key by setting the `AI_GATEWAY_API_KEY` environment variable in your `.env.local` file.
+- `DASHSCOPE_API_KEY`: DashScope access key.
+- `QDRANT_URL`: your Qdrant endpoint (e.g. `https://xxx.qdrant.tech` or `http://localhost:6333`).
+- `QDRANT_API_KEY`: Qdrant key (optional for local dev).
+- `QDRANT_COLLECTION`: collection storing your RAG segments.
+- `QDRANT_VECTOR_NAME`: named-vector field (omit if the collection uses the default vector).
 
-With the [AI SDK](https://ai-sdk.dev/docs/introduction), you can also switch to direct LLM providers like [OpenAI](https://openai.com), [Anthropic](https://anthropic.com), [Cohere](https://cohere.com/), and [many more](https://ai-sdk.dev/providers/ai-sdk-providers) with just a few lines of code.
-
-## Deploy Your Own
-
-You can deploy your own version of the Next.js AI Chatbot to Vercel with one click:
-
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/templates/next.js/nextjs-ai-chatbot)
+If you prefer other providers or vector stores, replace the logic in `lib/ai/dashscope.ts`, `lib/ai/rewrite.ts`, and `lib/db/qdrant.ts` accordingly.
 
 ## Running locally
 
-You will need to use the environment variables [defined in `.env.example`](.env.example) to run Next.js AI Chatbot. It's recommended you use [Vercel Environment Variables](https://vercel.com/docs/projects/environment-variables) for this, but a `.env` file is all that is necessary.
-
-> Note: You should not commit your `.env` file or it will expose secrets that will allow others to control access to your various AI and authentication provider accounts.
-
-1. Install Vercel CLI: `npm i -g vercel`
-2. Link local instance with Vercel and GitHub accounts (creates `.vercel` directory): `vercel link`
-3. Download your environment variables: `vercel env pull`
-
 ```bash
 pnpm install
-pnpm db:migrate # Setup database or apply latest database changes
 pnpm dev
 ```
 
-Your app template should now be running on [localhost:3000](http://localhost:3000).
+Open [http://localhost:3000](http://localhost:3000) to start chatting. Refreshing the page clears the conversation.
