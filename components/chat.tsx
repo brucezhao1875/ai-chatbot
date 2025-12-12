@@ -180,8 +180,11 @@ export function Chat() {
             <p className="badge">Stateless Mode</p>
             <h1>dharma chat</h1>
             <p className="hero-subtitle">
-              <span>Conversations live only in your browser. Refreshing clears the history.</span>
-              <span>无常无住，随用随散</span>
+              <span className="hero-subtitle__en">
+                Conversations stay in your browser
+              </span>
+              <span className="hero-subtitle__divider">·</span>
+              <span className="hero-subtitle__zh">无常无住，随用随散</span>
             </p>
           </header>
           <div className="chat-tabs-row">
