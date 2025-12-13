@@ -13,6 +13,7 @@ import {
 } from "react";
 import type { UIMessage } from "ai";
 import type { SourceItem } from "@/lib/types/rag";
+import { EMPTY_GUIDES } from "@/lib/guides";
 
 const SOURCE_PART_TYPE = "data-sources";
 
@@ -40,6 +41,7 @@ export function Chat() {
   const [selectedMessageId, setSelectedMessageId] = useState<string | null>(
     null
   );
+  const [guideIndex, setGuideIndex] = useState(0);
 
   useEffect(() => {
     if (!messages.length) {
@@ -56,6 +58,10 @@ export function Chat() {
       setSelectedMessageId(messages[messages.length - 1].id);
     }
   }, [messages, selectedMessageId]);
+
+  useEffect(() => {
+    setGuideIndex(Math.floor(Math.random() * EMPTY_GUIDES.length));
+  }, []);
 
   const messageSources = useMemo(() => {
     const map = new Map<string, SourcePayload>();
@@ -116,6 +122,7 @@ export function Chat() {
   const sourceHistory = useMemo(() => parseSourceHistory(messages), [messages]);
   const activeSourceId = resolvedSourceOwnerId;
   const sourceRefs = useRef<Record<string, HTMLLIElement | null>>({});
+  const inputRef = useRef<HTMLTextAreaElement | null>(null);
 
   useEffect(() => {
     if (!activeSourceId) {
@@ -127,10 +134,21 @@ export function Chat() {
     }
   }, [activeSourceId, activeTab, sourceHistory.length]);
 
+  useEffect(() => {
+    const textarea = inputRef.current;
+    if (!textarea) {
+      return;
+    }
+    textarea.style.height = "auto";
+    textarea.style.height = `${Math.min(textarea.scrollHeight, 200)}px`;
+  }, [input]);
+
   const messageList = useMemo(
     () => messages.filter((message) => message.role !== "system"),
     [messages]
   );
+
+  const initialGuide = EMPTY_GUIDES[guideIndex];
 
   const disabled = status === "submitted" || status === "streaming";
 
@@ -141,8 +159,7 @@ export function Chat() {
     }
   };
 
-  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
+  const submitCurrentMessage = async () => {
     const trimmed = input.trim();
     if (!trimmed) {
       return;
@@ -153,6 +170,11 @@ export function Chat() {
     });
     setInput("");
     setActiveTab("chat");
+  };
+
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    await submitCurrentMessage();
   };
 
   const handleSelectMessage = (message: UIMessage) => {
@@ -169,24 +191,40 @@ export function Chat() {
     }
   };
 
+  const handleInputKeyDown = (
+    event: KeyboardEvent<HTMLTextAreaElement>
+  ) => {
+    if (event.key !== "Enter" || event.shiftKey) {
+      return;
+    }
+    if ((event.nativeEvent as { isComposing?: boolean })?.isComposing) {
+      return;
+    }
+    event.preventDefault();
+    if (disabled || input.trim().length === 0) {
+      return;
+    }
+    void submitCurrentMessage();
+  };
+
   const showStop = status === "streaming";
-  const shouldShowForm = activeTab === "chat";
 
   return (
     <div className="chat-shell">
       <div className="chat-inner">
-        <div className="chat-hero">
-          <header>
-            <p className="badge">Stateless Mode</p>
-            <h1>dharma chat</h1>
-            <p className="hero-subtitle">
-              <span className="hero-subtitle__en">
-                Conversations stay in your browser
-              </span>
-              <span className="hero-subtitle__divider">·</span>
-              <span className="hero-subtitle__zh">无常无住，随用随散</span>
-            </p>
-          </header>
+        <header className="chat-hero">
+          <p className="badge">Stateless Mode</p>
+          <h1>dharma chat</h1>
+          <p className="hero-subtitle">
+            <span className="hero-subtitle__en">
+              Conversations stay in your browser
+            </span>
+            <span className="hero-subtitle__divider">·</span>
+            <span className="hero-subtitle__zh">无常无住，随用随散</span>
+          </p>
+        </header>
+
+        <section className="chat-main">
           <div className="chat-tabs-row">
             <div className="chat-tabs">
               <button
@@ -207,43 +245,47 @@ export function Chat() {
               </button>
             </div>
           </div>
-        </div>
-
-        <section className="chat-card">
-          {error && (
-            <div className="chat-error">
-              <p>出错啦：{error.message}</p>
-            </div>
-          )}
 
           <div className="chat-panel">
+            {error && (
+              <div className="chat-error">
+                <p>出错啦：{error.message}</p>
+              </div>
+            )}
             {activeTab === "chat" ? (
               <div className="message-list">
                 {messageList.length === 0 ? (
-                  <div className="message-list-empty">
-                    Ask a question to get started.
+                  <div className="message-list-empty empty-guide">
+                    <p className="empty-guide__title">{initialGuide.title}</p>
+                    <p className="empty-guide__subtitle">
+                      {initialGuide.subtitle}
+                    </p>
                   </div>
                 ) : (
-                  messageList.map((message) => (
-                    <article
-                      key={message.id}
-                      className={`message message--${
-                        message.role === "user" ? "user" : "assistant"
-                      } ${selectedMessageId === message.id ? "is-selected" : ""}`}
-                      tabIndex={0}
-                      onClick={() => handleSelectMessage(message)}
-                      onKeyDown={(event) => handleMessageKeyDown(event, message)}
-                    >
-                      <p className="message-role">
-                        {message.role === "user" ? "善友" : "法义助手"}
-                      </p>
-                      <div className="message-text prose prose-slate">
-                        <ReactMarkdown>
-                          {renderMessageText(message) || "(无可显示内容)"}
-                        </ReactMarkdown>
-                      </div>
-                    </article>
-                  ))
+                  messageList.map((message) => {
+                    const roleLabel =
+                      message.role === "assistant" ? "法义助手" : null;
+                    return (
+                      <article
+                        key={message.id}
+                        className={`message message--${
+                          message.role === "user" ? "user" : "assistant"
+                        } ${selectedMessageId === message.id ? "is-selected" : ""}`}
+                        tabIndex={0}
+                        onClick={() => handleSelectMessage(message)}
+                        onKeyDown={(event) => handleMessageKeyDown(event, message)}
+                      >
+                        {roleLabel && (
+                          <p className="message-role">{roleLabel}</p>
+                        )}
+                        <div className="message-text prose prose-slate">
+                          <ReactMarkdown>
+                            {renderMessageText(message) || "(无可显示内容)"}
+                          </ReactMarkdown>
+                        </div>
+                      </article>
+                    );
+                  })
                 )}
               </div>
             ) : (
@@ -312,37 +354,53 @@ export function Chat() {
               </div>
             )}
           </div>
-
-          {shouldShowForm && (
-            <form onSubmit={handleSubmit} className="chat-form">
-              <fieldset disabled={disabled}>
-                <textarea
-                  value={input}
-                  onChange={handleInputChange}
-                  placeholder="Send a message..."
-                />
-                <div className="chat-form-actions">
-                  {showStop && (
-                    <button
-                      type="button"
-                      className="button button--ghost"
-                      onClick={() => stop()}
-                    >
-                      Stop
-                    </button>
-                  )}
-                  <button
-                    type="submit"
-                    className="button button--primary"
-                    disabled={disabled || input.trim().length === 0}
-                  >
-                    {disabled ? "Sending…" : "Send"}
-                  </button>
-                </div>
-              </fieldset>
-            </form>
-          )}
         </section>
+
+        <form onSubmit={handleSubmit} className="chat-form">
+          <fieldset disabled={disabled}>
+            {showStop && (
+              <button
+                type="button"
+                className="button button--ghost chat-stop"
+                onClick={() => stop()}
+              >
+                Stop
+              </button>
+            )}
+            <div className="chat-input">
+              <textarea
+                ref={inputRef}
+                value={input}
+                onChange={handleInputChange}
+                onKeyDown={handleInputKeyDown}
+                placeholder="Send a message..."
+                rows={1}
+              />
+              <button
+                type="submit"
+                className="chat-input-send"
+                aria-label="Send message"
+                disabled={disabled || input.trim().length === 0}
+              >
+                <svg
+                  viewBox="0 0 20 20"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                  aria-hidden="true"
+                >
+                  <path
+                    d="M4.5 9.5 15 4l-5.5 10.5-.7-4.3-4.3-.7Z"
+                    stroke="currentColor"
+                    strokeWidth="1.4"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    fill="none"
+                  />
+                </svg>
+              </button>
+            </div>
+          </fieldset>
+        </form>
       </div>
     </div>
   );
