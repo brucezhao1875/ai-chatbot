@@ -148,7 +148,12 @@ export function Chat() {
     [messages]
   );
 
-  const initialGuide = EMPTY_GUIDES[guideIndex];
+  const initialGuide = EMPTY_GUIDES[guideIndex] ?? null;
+  const guideText =
+    initialGuide ?? "随缘发问，安住当下，让心轻轻开启。";
+  const isMultilineGuide = guideText.includes("\n");
+  const hasMessages = messageList.length > 0;
+  const hideGuide = hasMessages || input.trim().length > 0;
 
   const disabled = status === "submitted" || status === "streaming";
 
@@ -254,39 +259,48 @@ export function Chat() {
             )}
             {activeTab === "chat" ? (
               <div className="message-list">
-                {messageList.length === 0 ? (
-                  <div className="message-list-empty empty-guide">
-                    <p className="empty-guide__title">{initialGuide.title}</p>
-                    <p className="empty-guide__subtitle">
-                      {initialGuide.subtitle}
-                    </p>
-                  </div>
-                ) : (
-                  messageList.map((message) => {
-                    const roleLabel =
-                      message.role === "assistant" ? "法义助手" : null;
-                    return (
-                      <article
-                        key={message.id}
-                        className={`message message--${
-                          message.role === "user" ? "user" : "assistant"
-                        } ${selectedMessageId === message.id ? "is-selected" : ""}`}
-                        tabIndex={0}
-                        onClick={() => handleSelectMessage(message)}
-                        onKeyDown={(event) => handleMessageKeyDown(event, message)}
-                      >
-                        {roleLabel && (
-                          <p className="message-role">{roleLabel}</p>
-                        )}
-                        <div className="message-text prose prose-slate">
-                          <ReactMarkdown>
-                            {renderMessageText(message) || "(无可显示内容)"}
-                          </ReactMarkdown>
-                        </div>
-                      </article>
-                    );
-                  })
-                )}
+                <div
+                  className={`message-list-empty empty-guide${
+                    hideGuide ? " is-hidden" : ""
+                  }`}
+                  aria-hidden={hideGuide}
+                >
+                  <p
+                    className={`empty-guide__quote${
+                      isMultilineGuide ? " is-multiline" : ""
+                    }`}
+                  >
+                    {guideText}
+                  </p>
+                </div>
+                {hasMessages
+                  ? messageList.map((message) => {
+                      const roleLabel =
+                        message.role === "assistant" ? "法义助手" : null;
+                      return (
+                        <article
+                          key={message.id}
+                          className={`message message--${
+                            message.role === "user" ? "user" : "assistant"
+                          } ${
+                            selectedMessageId === message.id ? "is-selected" : ""
+                          }`}
+                          tabIndex={0}
+                          onClick={() => handleSelectMessage(message)}
+                          onKeyDown={(event) => handleMessageKeyDown(event, message)}
+                        >
+                          {roleLabel && (
+                            <p className="message-role">{roleLabel}</p>
+                          )}
+                          <div className="message-text prose prose-slate">
+                            <ReactMarkdown>
+                              {renderMessageText(message) || "(无可显示内容)"}
+                            </ReactMarkdown>
+                          </div>
+                        </article>
+                      );
+                    })
+                  : null}
               </div>
             ) : (
               <div className="sources-panel">
