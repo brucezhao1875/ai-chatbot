@@ -364,8 +364,7 @@ export async function POST(request: Request) {
       : "当前没有可引用的资料，请直接根据通用常识回答。";
 
     const baseInstruction = `${PERSONA_PROMPT}
-你是一个佛法学习助手，请以平和、清晰的语气回答问题。优先引用提供的资料内容，并在不确定时坦诚告知。`;
-
+你是一个佛法学习助手，请以平和、清晰的语气回答问题。务必优先引用提供的资料内容，说明出处，避免自由发挥导致佛法语义被曲解；若资料不足，请坦诚告知。`;
     const guidance = `${baseInstruction}\n\n${contextBlock}`;
 
     const augmentedMessages: CoreMessage[] = [...normalizedMessages];
